@@ -9,6 +9,7 @@ A full-stack finance dashboard system with role based access control, financial 
 - MongoDB + Mongoose
 - JWT Authentication
 - bcryptjs
+- express-rate-limit
 
 **Frontend**
 - React 18 + Vite
@@ -59,7 +60,7 @@ finance-frontend/
 
 ### Prerequisites
 - Node.js v16+
-- MongoDB running locally (or MongoDB Compass)
+- MongoDB running locally (or MongoDB Atlas)
 
 ### Backend Setup
 
@@ -82,6 +83,65 @@ npm run dev
 
 App runs on `http://localhost:5173`
 
+---
+
+## Testing the Application
+
+Once both servers are running, open `http://localhost:5173` in your browser.
+
+### Step 1 — Register test accounts
+
+Use the Register page to create the following three accounts to test all roles:
+
+| Name         | Email                  | Password   | Role     |
+|--------------|------------------------|------------|----------|
+| Admin User   | admin@test.com         | admin123   | Admin    |
+| Analyst User | analyst@test.com       | analyst123 | Analyst  |
+| Viewer User  | viewer@test.com        | viewer123  | Viewer   |
+
+### Step 2 — Add sample financial records
+
+Log in as **Admin** and go to the Records page. Click **New Record** and add a few sample entries:
+
+| Amount  | Type    | Category   | Date       |
+|---------|---------|------------|------------|
+| 50000   | income  | Salary     | 2025-01-01 |
+| 12000   | expense | Rent       | 2025-01-05 |
+| 3000    | expense | Food       | 2025-01-10 |
+| 8000    | income  | Freelance  | 2025-02-01 |
+| 2000    | expense | Transport  | 2025-02-10 |
+
+### Step 3 — Test role-based access
+
+| Action                        | Admin | Analyst | Viewer |
+|-------------------------------|-------|---------|--------|
+| View Records page             | ✅    | ✅      | ✅     |
+| Create / Edit / Delete record | ✅    | ❌      | ❌     |
+| View Dashboard with charts    | ✅    | ✅      | ❌     |
+| Export records as CSV         | ✅    | ✅      | ❌     |
+| Manage Users page             | ✅    | ❌      | ❌     |
+
+### Step 4 — Test API directly (optional)
+
+You can also test the API using Postman or curl:
+
+```bash
+# Register
+curl -X POST http://localhost:5000/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Admin User","email":"admin@test.com","password":"admin123","role":"admin"}'
+
+# Login
+curl -X POST http://localhost:5000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@test.com","password":"admin123"}'
+
+# Health check
+curl http://localhost:5000/api/health
+```
+
+---
+
 ## Roles & Permissions
 
 | Action                   | Viewer | Analyst | Admin |
@@ -91,6 +151,7 @@ App runs on `http://localhost:5173`
 | Create records           | ❌     | ❌      | ✅    |
 | Update records           | ❌     | ❌      | ✅    |
 | Delete records           | ❌     | ❌      | ✅    |
+| Export CSV               | ❌     | ✅      | ✅    |
 | Manage users             | ❌     | ❌      | ✅    |
 
 ## API Reference
@@ -103,15 +164,16 @@ App runs on `http://localhost:5173`
 | GET    | `/api/auth/me`        | Yes  |
 
 ### Financial Records
-| Method | Endpoint           | Roles                   |
-|--------|--------------------|-------------------------|
-| GET    | `/api/records`     | viewer, analyst, admin  |
-| GET    | `/api/records/:id` | viewer, analyst, admin  |
-| POST   | `/api/records`     | admin                   |
-| PUT    | `/api/records/:id` | admin                   |
-| DELETE | `/api/records/:id` | admin                   |
+| Method | Endpoint                | Roles                   |
+|--------|-------------------------|-------------------------|
+| GET    | `/api/records`          | viewer, analyst, admin  |
+| GET    | `/api/records/export`   | analyst, admin          |
+| GET    | `/api/records/:id`      | viewer, analyst, admin  |
+| POST   | `/api/records`          | admin                   |
+| PUT    | `/api/records/:id`      | admin                   |
+| DELETE | `/api/records/:id`      | admin                   |
 
-**Filter params:** `type`, `category`, `startDate`, `endDate`, `page`, `limit`
+**Filter & Search params:** `type`, `category`, `startDate`, `endDate`, `search`, `page`, `limit`
 
 ### Dashboard
 | Method | Endpoint                  | Roles           |
@@ -119,12 +181,17 @@ App runs on `http://localhost:5173`
 | GET    | `/api/dashboard/summary`  | analyst, admin  |
 
 ### Users (Admin only)
-| Method | Endpoint        |
-|--------|-----------------|
-| GET    | `/api/users`    |
-| GET    | `/api/users/:id`|
-| PUT    | `/api/users/:id`|
-| DELETE | `/api/users/:id`|
+| Method | Endpoint         |
+|--------|------------------|
+| GET    | `/api/users`     |
+| GET    | `/api/users/:id` |
+| PUT    | `/api/users/:id` |
+| DELETE | `/api/users/:id` |
+
+### Health Check
+| Method | Endpoint       |
+|--------|----------------|
+| GET    | `/api/health`  |
 
 ## Error Response Format
 
@@ -139,6 +206,7 @@ App runs on `http://localhost:5173`
 | 403    | Forbidden (wrong role)   |
 | 404    | Not found                |
 | 409    | Duplicate (email exists) |
+| 429    | Too many requests        |
 | 500    | Server error             |
 
 ## Assumptions & Design Decisions
@@ -153,18 +221,22 @@ App runs on `http://localhost:5173`
 
 5. **MongoDB** — Chosen for flexible schema and native aggregation pipeline support for dashboard queries.
 
-6. **Savings Rate** — Frontend calculates and displays savings rate as `(netBalance / totalIncome) * 100` for quick financial health insight.
+6. **Pagination** — Default 10 records per page, configurable via `limit` query param.
 
-7. **Pagination** — Default 10 records per page, configurable via `limit` query param.
+7. **Rate Limiting** — Global limit of 100 requests per 15 min. Auth routes are stricter at 20 requests per 15 min to prevent brute force attacks.
+
+8. **Self-protection** — Admins cannot delete or modify their own account to prevent accidental lockout.
 
 ## Optional Enhancements Implemented
 
 - ✅ JWT Authentication
 - ✅ Pagination for record listing
-- ✅ Search / filter support
+- ✅ Search support (searches category and notes)
 - ✅ Soft delete functionality
-- ✅ React frontend with charts (Area, Pie)
+- ✅ Rate limiting (global + auth-specific)
+- ✅ CSV export for records (analyst + admin)
+- ✅ React frontend with charts (Bar, Pie)
 - ✅ Role-based UI (pages and buttons hidden by role)
-- ✅ Savings rate analytics
-- ✅ Monthly trends (12 months)
+- ✅ Monthly trends (last 12 months)
 - ✅ Category breakdown
+- ✅ DB health check endpoint
