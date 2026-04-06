@@ -3,7 +3,6 @@ require('dotenv').config({ path: path.join(__dirname, '.env'), override: true })
 
 const express = require('express');
 const cors = require('cors');
-const rateLimit = require('express-rate-limit');
 
 const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
@@ -15,25 +14,6 @@ const app = express();
 
 app.use(cors());
 app.use(express.json());
-
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100,
-  message: { success: false, message: 'Too many requests, please try again later.' },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 20,
-  message: { success: false, message: 'Too many login attempts, please try again later.' },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
-app.use('/api', limiter);
-app.use('/api/auth', authLimiter);
 
 // Routes
 app.use('/api/auth', authRoutes);
