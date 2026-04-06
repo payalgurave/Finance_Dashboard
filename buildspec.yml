@@ -4,17 +4,18 @@ phases:
   install:
     runtime-versions:
       nodejs: 18
+  pre_build:
     commands:
       - echo Installing dependencies...
       - cd finance-backend
       - npm install
+      - cd ..
 
   build:
     commands:
-      - echo Build completed
+      - echo Build completed on `date`
 
 artifacts:
   files:
     - '**/*'
   base-directory: finance-backend
-  discard-paths: no
