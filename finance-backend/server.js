@@ -1,3 +1,11 @@
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '.env') });
+
+// Override if Amazon Q plugin injected wrong value
+if (!process.env.MONGO_URI || !process.env.MONGO_URI.startsWith('mongodb')) {
+  process.env.MONGO_URI = 'mongodb://mongo:vxgrNwXKuuPMJwZyTkzRtxYFDWmWrgEm@interchange.proxy.rlwy.net:23742/finance_db?authSource=admin';
+}
+
 const app = require('./app');
 const connectDB = require('./config/db');
 

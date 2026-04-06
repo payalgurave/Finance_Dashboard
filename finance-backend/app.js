@@ -1,8 +1,3 @@
-if (process.env.NODE_ENV !== 'production') {
-  const path = require('path');
-  require('dotenv').config({ path: path.join(__dirname, '.env') });
-}
-
 const express = require('express');
 const cors = require('cors');
 
@@ -14,7 +9,7 @@ const errorHandler = require('./utils/errorHandler');
 
 const app = express();
 
-app.use(cors());
+app.use(cors({ origin: '*' }));
 app.use(express.json());
 
 // Routes
