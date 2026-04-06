@@ -1,0 +1,26 @@
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      nodejs: 18
+    commands:
+      - echo Installing dependencies...
+      - cd finance-backend
+      - npm install
+
+  build:
+    commands:
+      - echo Build started on `date`
+      - echo Nothing to compile for Node.js
+
+  post_build:
+    commands:
+      - echo Build completed on `date`
+
+artifacts:
+  files:
+    - finance-backend/**/*
+    - finance-backend/package.json
+    - finance-backend/Procfile
+  discard-paths: no
