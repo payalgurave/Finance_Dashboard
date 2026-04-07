@@ -8,6 +8,8 @@ const ACTION_STYLES = {
   EXPORT_CSV:    { color: 'bg-indigo-50 text-indigo-700', icon: '📥' },
   UPDATE_USER:   { color: 'bg-amber-50 text-amber-700', icon: '👤' },
   DELETE_USER:   { color: 'bg-rose-50 text-rose-700', icon: '❌' },
+  LOGIN:         { color: 'bg-slate-100 text-slate-600', icon: '🔐' },
+  REGISTER:      { color: 'bg-purple-50 text-purple-700', icon: '🆕' },
 };
 
 const ActivityLog = () => {
