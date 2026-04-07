@@ -89,9 +89,18 @@ App runs on `http://localhost:5173`
 
 Once both servers are running, open `http://localhost:5173` in your browser.
 
-### Step 1 — Register test accounts
+### Step 1 — Seed the database (recommended)
 
-Use the Register page to create the following three accounts to test all roles:
+Instead of manually creating accounts, run the seed script:
+
+```bash
+cd finance-backend
+npm run seed
+```
+
+This creates 3 test users and 50 financial records automatically.
+
+### Test Credentials (after seeding)
 
 | Name         | Email                  | Password   | Role     |
 |--------------|------------------------|------------|----------|
