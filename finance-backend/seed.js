@@ -1,7 +1,6 @@
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs');
 const User = require('./models/User');
 const FinancialRecord = require('./models/FinancialRecord');
 
@@ -73,10 +72,7 @@ const seed = async () => {
   console.log('Cleared existing seed data');
 
   const createdUsers = await Promise.all(
-    USERS.map(async (u) => {
-      const hashed = await bcrypt.hash(u.password, 10);
-      return User.create({ ...u, password: hashed });
-    })
+    USERS.map((u) => User.create(u))
   );
   console.log(`Created ${createdUsers.length} users`);
 
