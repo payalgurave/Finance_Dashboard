@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { getSummary } from '../api/dashboard';
 import { useAuth } from '../context/AuthContext';
+import useCountUp from '../hooks/useCountUp';
 import {
-  AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip,
+  AreaChart, Area, XAxis, YAxis, Tooltip,
   ResponsiveContainer, PieChart, Pie, Cell, CartesianGrid,
 } from 'recharts';
 
@@ -27,26 +28,24 @@ const CustomTooltip = ({ active, payload, label }) => {
   );
 };
 
-const StatCard = ({ label, value, icon, gradient, change }) => (
-  <div className={`relative overflow-hidden rounded-2xl p-6 text-white bg-gradient-to-br ${gradient} shadow-lg`}>
-    <div className="absolute -right-4 -top-4 w-24 h-24 bg-white/10 rounded-full" />
-    <div className="absolute -right-2 -bottom-6 w-32 h-32 bg-white/5 rounded-full" />
-    <div className="relative z-10">
-      <div className="flex items-center justify-between mb-4">
-        <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
+const AnimatedStatCard = ({ label, value, icon, gradient }) => {
+  const animated = useCountUp(value);
+  return (
+    <div className={`relative overflow-hidden rounded-2xl p-6 text-white bg-gradient-to-br ${gradient} shadow-lg`}>
+      <div className="absolute -right-4 -top-4 w-24 h-24 bg-white/10 rounded-full" />
+      <div className="absolute -right-2 -bottom-6 w-32 h-32 bg-white/5 rounded-full" />
+      <div className="relative z-10">
+        <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm mb-4">
           {icon}
         </div>
-        {change !== undefined && (
-          <span className={`text-xs font-semibold px-2 py-1 rounded-full ${change >= 0 ? 'bg-white/20' : 'bg-black/20'}`}>
-            {change >= 0 ? '↑' : '↓'} {Math.abs(change)}%
-          </span>
-        )}
+        <p className="text-2xl font-black tracking-tight mb-1">
+          ₹{animated.toLocaleString('en-IN')}
+        </p>
+        <p className="text-white/70 text-sm font-medium">{label}</p>
       </div>
-      <p className="text-2xl font-black tracking-tight mb-1">{fmt(value)}</p>
-      <p className="text-white/70 text-sm font-medium">{label}</p>
     </div>
-  </div>
-);
+  );
+};
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -61,6 +60,49 @@ const Dashboard = () => {
       .finally(() => setLoading(false));
   }, []);
 
+  const handleDownloadPDF = () => {
+    if (!data) return;
+    const savingsRate = data.totalIncome > 0 ? Math.round((data.netBalance / data.totalIncome) * 100) : 0;
+    const topCategories = data.categoryTotals.slice(0, 5)
+      .map((c) => `<tr><td style="padding:6px 12px;border-bottom:1px solid #f1f5f9">${c._id.category}</td><td style="padding:6px 12px;border-bottom:1px solid #f1f5f9;text-transform:capitalize">${c._id.type}</td><td style="padding:6px 12px;border-bottom:1px solid #f1f5f9;font-weight:700">₹${c.total.toLocaleString('en-IN')}</td></tr>`)
+      .join('');
+
+    const html = `
+      <html><head><title>Finance Report</title>
+      <style>body{font-family:Arial,sans-serif;padding:40px;color:#1e293b}h1{color:#4f46e5;margin-bottom:4px}
+      .subtitle{color:#94a3b8;font-size:13px;margin-bottom:32px}
+      .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:32px}
+      .card{padding:20px;border-radius:12px;color:white}
+      .green{background:linear-gradient(135deg,#10b981,#0d9488)}
+      .red{background:linear-gradient(135deg,#f43f5e,#db2777)}
+      .indigo{background:linear-gradient(135deg,#6366f1,#7c3aed)}
+      .card-label{font-size:12px;opacity:0.8;margin-bottom:4px}
+      .card-value{font-size:22px;font-weight:900}
+      table{width:100%;border-collapse:collapse;font-size:13px}
+      th{background:#f8fafc;padding:10px 12px;text-align:left;font-size:11px;text-transform:uppercase;color:#94a3b8;letter-spacing:0.05em}
+      .footer{margin-top:40px;font-size:11px;color:#94a3b8;text-align:center}
+      .badge{display:inline-block;padding:4px 12px;border-radius:999px;font-size:12px;font-weight:700;background:#eef2ff;color:#4f46e5}
+      </style></head>
+      <body>
+        <h1>₹ FinanceApp — Financial Report</h1>
+        <p class="subtitle">Generated on ${new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })} &nbsp;|&nbsp; Prepared for: ${user?.name} &nbsp;|&nbsp; Role: <span class="badge">${user?.role}</span></p>
+        <div class="cards">
+          <div class="card green"><div class="card-label">Total Income</div><div class="card-value">₹${data.totalIncome.toLocaleString('en-IN')}</div></div>
+          <div class="card red"><div class="card-label">Total Expenses</div><div class="card-value">₹${data.totalExpenses.toLocaleString('en-IN')}</div></div>
+          <div class="card indigo"><div class="card-label">Net Balance</div><div class="card-value">₹${data.netBalance.toLocaleString('en-IN')}</div></div>
+        </div>
+        <p style="margin-bottom:16px">Savings Rate: <strong>${savingsRate}%</strong> &nbsp;${savingsRate >= 20 ? '🎉 Excellent savings!' : savingsRate >= 0 ? '💡 Aim for 20%+' : '⚠️ Expenses exceed income'}</p>
+        <h3 style="margin-bottom:12px;color:#475569">Top Categories</h3>
+        <table><thead><tr><th>Category</th><th>Type</th><th>Total</th></tr></thead><tbody>${topCategories}</tbody></table>
+        <div class="footer">This report was auto-generated by FinanceApp &nbsp;•&nbsp; Confidential</div>
+      </body></html>`;
+
+    const win = window.open('', '_blank');
+    win.document.write(html);
+    win.document.close();
+    win.print();
+  };
+
   if (loading)
     return (
       <div className="flex flex-col items-center justify-center h-full gap-3">
@@ -72,7 +114,7 @@ const Dashboard = () => {
   if (error)
     return (
       <div className="flex items-center justify-center h-full">
-        <div className="bg-red-50 border border-red-100 text-red-600 px-6 py-4 rounded-2xl text-sm">{error}</div>
+        <div className="bg-red-50 text-red-600 px-6 py-4 rounded-2xl text-sm">{error}</div>
       </div>
     );
 
@@ -91,27 +133,30 @@ const Dashboard = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-black text-slate-900 tracking-tight">
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
             Good {new Date().getHours() < 12 ? 'Morning' : new Date().getHours() < 17 ? 'Afternoon' : 'Evening'}, {user?.name?.split(' ')[0]} 👋
           </h1>
-          <p className="text-slate-500 text-sm mt-1">Here's your financial overview for today</p>
+          <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Here's your financial overview</p>
         </div>
-        <div className="hidden sm:flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-4 py-2 shadow-sm">
-          <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-          <span className="text-sm text-slate-600 font-medium">{new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
-        </div>
+        <button onClick={handleDownloadPDF}
+          className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm px-4 py-2.5 rounded-xl font-medium transition-colors shadow-sm">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          Download Report
+        </button>
       </div>
 
-      {/* Stat Cards */}
+      {/* Animated Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-        <StatCard label="Total Income" value={data.totalIncome} gradient="from-emerald-500 to-teal-600"
+        <AnimatedStatCard label="Total Income" value={data.totalIncome} gradient="from-emerald-500 to-teal-600"
           icon={<svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11l5-5m0 0l5 5m-5-5v12" /></svg>}
         />
-        <StatCard label="Total Expenses" value={data.totalExpenses} gradient="from-rose-500 to-pink-600"
+        <AnimatedStatCard label="Total Expenses" value={data.totalExpenses} gradient="from-rose-500 to-pink-600"
           icon={<svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 13l-5 5m0 0l-5-5m5 5V6" /></svg>}
         />
-        <StatCard label="Net Balance" value={data.netBalance} gradient={data.netBalance >= 0 ? "from-indigo-500 to-purple-600" : "from-orange-500 to-red-600"}
-          icon={<svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" /></svg>}
+        <AnimatedStatCard label="Net Balance" value={Math.abs(data.netBalance)} gradient={data.netBalance >= 0 ? 'from-indigo-500 to-purple-600' : 'from-orange-500 to-red-600'}
+          icon={<svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
         />
       </div>
 
@@ -123,24 +168,23 @@ const Dashboard = () => {
           </div>
           <div>
             <p className="text-white font-bold text-lg">Savings Rate: {savingsRate}%</p>
-            <p className="text-slate-400 text-sm">{savingsRate >= 20 ? '🎉 Great job! You\'re saving well.' : savingsRate >= 0 ? '💡 Try to save at least 20% of income.' : '⚠️ Expenses exceed income this period.'}</p>
+            <p className="text-slate-400 text-sm">{savingsRate >= 20 ? "🎉 Great job! You're saving well." : savingsRate >= 0 ? '💡 Try to save at least 20% of income.' : '⚠️ Expenses exceed income this period.'}</p>
           </div>
         </div>
-        <div className="hidden sm:block">
-          <div className="w-32 h-2 bg-slate-700 rounded-full overflow-hidden">
-            <div className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full transition-all" style={{ width: `${Math.min(Math.max(savingsRate, 0), 100)}%` }} />
+        <div className="hidden sm:block w-32">
+          <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
+            <div className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full transition-all duration-1000" style={{ width: `${Math.min(Math.max(savingsRate, 0), 100)}%` }} />
           </div>
-          <p className="text-slate-500 text-xs mt-1 text-right">{savingsRate}% of income saved</p>
+          <p className="text-slate-500 text-xs mt-1 text-right">{savingsRate}% saved</p>
         </div>
       </div>
 
-      {/* Charts Row */}
+      {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Area Chart */}
-        <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+        <div className="lg:col-span-2 bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 p-6">
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h2 className="text-base font-bold text-slate-800">Monthly Overview</h2>
+              <h2 className="text-base font-bold text-slate-800 dark:text-white">Monthly Overview</h2>
               <p className="text-xs text-slate-400 mt-0.5">Income vs Expenses trend</p>
             </div>
             <div className="flex items-center gap-3 text-xs">
@@ -170,19 +214,13 @@ const Dashboard = () => {
               </AreaChart>
             </ResponsiveContainer>
           ) : (
-            <div className="flex flex-col items-center justify-center h-48 text-slate-300">
-              <svg className="w-12 h-12 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
-              <p className="text-sm">No data yet — add some records!</p>
-            </div>
+            <div className="flex items-center justify-center h-48 text-slate-300 text-sm">No data yet</div>
           )}
         </div>
 
-        {/* Donut Chart */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
-          <div className="mb-6">
-            <h2 className="text-base font-bold text-slate-800">By Category</h2>
-            <p className="text-xs text-slate-400 mt-0.5">Spending breakdown</p>
-          </div>
+        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 p-6">
+          <h2 className="text-base font-bold text-slate-800 dark:text-white mb-1">By Category</h2>
+          <p className="text-xs text-slate-400 mb-5">Spending breakdown</p>
           {pieData.length ? (
             <>
               <ResponsiveContainer width="100%" height={160}>
@@ -198,9 +236,9 @@ const Dashboard = () => {
                   <div key={i} className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: COLORS[i % COLORS.length] }} />
-                      <span className="text-xs text-slate-600 truncate max-w-24">{item.name}</span>
+                      <span className="text-xs text-slate-600 dark:text-slate-400 truncate max-w-24">{item.name}</span>
                     </div>
-                    <span className="text-xs font-semibold text-slate-700">{fmtShort(item.value)}</span>
+                    <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">{fmtShort(item.value)}</span>
                   </div>
                 ))}
               </div>
@@ -212,46 +250,38 @@ const Dashboard = () => {
       </div>
 
       {/* Recent Activity */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-        <div className="px-6 py-5 border-b border-slate-50 flex items-center justify-between">
+      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 overflow-hidden">
+        <div className="px-6 py-5 border-b border-slate-50 dark:border-slate-700 flex items-center justify-between">
           <div>
-            <h2 className="text-base font-bold text-slate-800">Recent Transactions</h2>
+            <h2 className="text-base font-bold text-slate-800 dark:text-white">Recent Transactions</h2>
             <p className="text-xs text-slate-400 mt-0.5">Latest 5 financial entries</p>
           </div>
           <span className="text-xs bg-indigo-50 text-indigo-600 font-semibold px-3 py-1 rounded-full">{data.recentActivity.length} entries</span>
         </div>
         {data.recentActivity.length ? (
-          <div className="divide-y divide-slate-50">
+          <div className="divide-y divide-slate-50 dark:divide-slate-700">
             {data.recentActivity.map((r) => (
-              <div key={r._id} className="flex items-center justify-between px-6 py-4 hover:bg-slate-50/50 transition-colors">
+              <div key={r._id} className="flex items-center justify-between px-6 py-4 hover:bg-slate-50/50 dark:hover:bg-slate-700/30 transition-colors">
                 <div className="flex items-center gap-4">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-sm ${r.type === 'income' ? 'bg-emerald-50' : 'bg-rose-50'}`}>
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${r.type === 'income' ? 'bg-emerald-50' : 'bg-rose-50'}`}>
                     {r.type === 'income'
                       ? <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11l5-5m0 0l5 5m-5-5v12" /></svg>
                       : <svg className="w-5 h-5 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 13l-5 5m0 0l-5-5m5 5V6" /></svg>
                     }
                   </div>
                   <div>
-                    <p className="text-sm font-semibold text-slate-800">{r.category}</p>
+                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">{r.category}</p>
                     <p className="text-xs text-slate-400">{new Date(r.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
                   </div>
                 </div>
-                <div className="text-right">
-                  <p className={`text-sm font-black ${r.type === 'income' ? 'text-emerald-600' : 'text-rose-500'}`}>
-                    {r.type === 'income' ? '+' : '-'}{fmt(r.amount)}
-                  </p>
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${r.type === 'income' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-500'}`}>
-                    {r.type}
-                  </span>
-                </div>
+                <p className={`text-sm font-black ${r.type === 'income' ? 'text-emerald-600' : 'text-rose-500'}`}>
+                  {r.type === 'income' ? '+' : '-'}{fmt(r.amount)}
+                </p>
               </div>
             ))}
           </div>
         ) : (
-          <div className="flex flex-col items-center justify-center py-16 text-slate-300">
-            <svg className="w-12 h-12 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
-            <p className="text-sm">No transactions yet</p>
-          </div>
+          <div className="flex items-center justify-center py-16 text-slate-300 text-sm">No transactions yet</div>
         )}
       </div>
     </div>

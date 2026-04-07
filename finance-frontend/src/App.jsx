@@ -10,6 +10,7 @@ import Dashboard from './pages/Dashboard';
 import Records from './pages/Records';
 import Users from './pages/Users';
 import Profile from './pages/Profile';
+import ActivityLog from './pages/ActivityLog';
 
 const AppRoutes = () => {
   const { user } = useAuth();
@@ -22,6 +23,7 @@ const AppRoutes = () => {
         <Route path="/records" element={<ProtectedRoute roles={['viewer', 'analyst', 'admin']}><Records /></ProtectedRoute>} />
         <Route path="/users" element={<ProtectedRoute roles={['admin']}><Users /></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute roles={['viewer', 'analyst', 'admin']}><Profile /></ProtectedRoute>} />
+        <Route path="/activity" element={<ProtectedRoute roles={['admin']}><ActivityLog /></ProtectedRoute>} />
       </Route>
       <Route path="*" element={user ? <Navigate to={user.role === 'viewer' ? '/records' : '/dashboard'} /> : <Navigate to="/login" />} />
     </Routes>

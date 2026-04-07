@@ -5,6 +5,7 @@ const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
 const recordRoutes = require('./routes/recordRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
+const activityRoutes = require('./routes/activityRoutes');
 const errorHandler = require('./utils/errorHandler');
 
 const app = express();
@@ -17,6 +18,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/records', recordRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/activity', activityRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
